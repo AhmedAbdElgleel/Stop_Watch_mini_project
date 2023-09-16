@@ -1,0 +1,319 @@
+/*
+=============================================================================
+ * File Name   : main.c
+ * Time 	   : 5:47:13 AM
+ * Created on  : Sep 10, 2023
+ * Author Name : Ahmed Abd Elgleel
+=============================================================================
+*/
+		/*----------------- Libraries and Definitions ------------*/
+#include<avr/io.h>
+#include<avr/interrupt.h>
+#include<util/delay.h>
+#define ONE_MINUIT	60
+#define ONE_HOUR	60
+#define MAX_HOURS	99
+
+		/*--------------------- Global Variables ------------------*/
+unsigned char tick_sec=0;						/*Global var for seconds calculations*/
+unsigned char tick_min=0;						/*Global var for min calculations*/
+unsigned char tick_hr=0;						/*Global var for seconds calculations*/
+unsigned char count_down=0;
+
+		/*--------------------- Functions Prototypes ---------------------------*/
+void pins_Configuration(void);						/* function for Configuration of input and output pins */
+void ext_INT0_init(void);							/* External Interrupt INT0 Initialization */
+void ext_INT1_init(void);							/* External Interrupt INT1 Initialization */
+void ext_INT2_init(void);							/* External Interrupt INT2 Initialization */
+void GIE(void);										/* Function used to Enable The Global Interrupts */
+void timer1_CTC_init(void);							/* Initialization timer1 on compare mode */
+
+		/*-------------------------- The Main Function ----------------------------*/
+int main(void)
+{
+							/*------- Initialization --------*/
+	/*Some Flags for Button releasing check*/
+	unsigned char flag_PB0=0;
+	unsigned char flag_PB1=0;
+	unsigned char flag_PB3=0;
+	unsigned char flag_PB4=0;
+	unsigned char flag_PB5=0;
+	unsigned char flag_PB6=0;
+	unsigned char flag_PB7=0;
+	pins_Configuration();
+	ext_INT0_init();
+	ext_INT1_init();
+	ext_INT2_init();
+	GIE();
+	timer1_CTC_init();
+	while(1)
+	{
+		PORTA = 0x20;										/* Enable the first 7 segment for first digit in seconds */
+		PORTC = (PORTC & 0xF0) | ((tick_sec % 10) & 0x0F);	/* Put the value of first digit in seconds in first 4-pins in PORTC */
+		_delay_ms(3);										/* Small delay to show the number (multiplexing method) */
+
+		PORTA = 0x10;										/* Enable the second 7 segment for second digit in seconds */
+		PORTC = (PORTC & 0xF0) | ((tick_sec / 10) & 0x0F);	/* Put the value of second digit in seconds in first 4-pins in PORTC */
+		_delay_ms(3);										/* small delay the show the number (multiplexing method) */
+
+		PORTA = 0x08;										/* Enable the third 7 segment for first digit in minutes */
+		PORTC = (PORTC & 0xF0) | ((tick_min % 10) & 0x0F);	/* put the value of first digit in minutes in first 4-pins in PORTC */
+		_delay_ms(3);										/* small delay the show the number (multiplexing method) */
+
+		PORTA = 0x04;										/* Enable the fourth 7 segment for second digit in minutes */
+		PORTC = (PORTC & 0xF0) | ((tick_min / 10) & 0x0F);	/* put the value of second digit in minutes in first 4-pins in PORTC */
+		_delay_ms(3);										/* small delay the show the number (multiplexing method) */
+
+		PORTA = 0x02;										/* Enable the fifth 7 segment for first digit in hours */
+		PORTC = (PORTC & 0xF0) | ((tick_hr % 10) & 0x0F);	/* put the value of first digit in hours in first 4-pins in PORTC */
+		_delay_ms(3);										/* small delay for show the number (multiplexing method) */
+
+		PORTA = 0x01;										/* Enable the sixth 7 segment for second digit in hours */
+		PORTC = (PORTC & 0xF0) | ((tick_hr / 10) & 0x0F);	/* put the value of second digit of hours in first 4-pins in PORTC */
+		_delay_ms(3);										/* small delay for show the number (multiplexing method) */
+
+		if(!(PINB&(1<<PB0)))	/*In case button on pin PB0 is pressed*/
+		{
+			if(flag_PB0==0)
+			{
+				if(tick_hr>0)	/*Decrement hours*/
+				{
+					tick_hr--;
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+				flag_PB0=1;
+			}
+
+		}
+		else
+		{
+			/*button is released reset the button flag to value 0 again*/
+			flag_PB0=0;
+		}
+		if(!(PINB&(1<<PB1)))	/*In case button on pin PB1 is pressed*/
+		{
+			if(flag_PB1==0)
+			{
+				if(tick_hr<99)	/*Increment hours*/
+				{
+					tick_hr++;
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+				flag_PB1=1;
+			}
+
+		}
+		else
+		{
+			/*button is released reset the button flag to value 0 again*/
+			flag_PB1=0;
+		}
+		if(!(PINB&(1<<PB3)))	/*In case button on pin PB3 is pressed*/
+		{
+			if(flag_PB3==0)		/*Decrement min*/
+			{
+				if(tick_min>0)
+				{
+					tick_min--;
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+				flag_PB3=1;
+			}
+		}
+		else
+		{
+			/*button is released reset the button flag to value 0 again*/
+			flag_PB3=0;
+		}
+		if(!(PINB&(1<<PB4)))	/*In case button on pin PB4 is pressed*/
+		{
+			if(flag_PB4==0)
+			{
+				if(tick_min<60)/*Increment min*/
+				{
+					tick_min++;
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+					flag_PB4=1;
+			}
+		}
+		else
+			{
+			/*button is released reset the button flag to value 0 again*/
+				flag_PB4=0;
+			}
+		if(!(PINB&(1<<PB5)))	/*In case button on pin PB5 is pressed*/
+		{
+			if(flag_PB5==0)
+			{
+				if(tick_sec>0)
+				{
+					tick_sec--;		/*Decrement sec*/
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+					flag_PB5=1;
+			}
+		}
+		else
+			{
+			/*button is released reset the button flag to value 0 again*/
+				flag_PB5=0;
+			}
+		if(!(PINB&(1<<PB6)))	/*In case button on pin PB6 is pressed*/
+		{
+			if(flag_PB6==0)
+			{
+				if(tick_sec<60)	/*Increment Sec*/
+				{
+					tick_sec++;
+				}
+				/*set the button flag value to 1 to not enter here again until the button is released*/
+					flag_PB6=1;
+			}
+		}
+		else
+			{
+			/*button is released reset the button flag to value 0 again*/
+				flag_PB6=0;
+			}
+		if(!(PINB&(1<<PB7)))	/*In case button on pin PB7 is pressed*/
+		{
+			if(flag_PB7==0)
+			{
+				flag_PB7=1;
+				count_down=1;	/*as long as buttin p*/
+			}
+		}
+		else
+			{
+				count_down=0;
+				flag_PB7=0;
+			}
+
+
+	}
+}
+
+		/*------------ Configuration of input and output pins --------------*/
+void pins_Configuration(void)
+{
+	DDRD|=(1<<PD0);				/* Define output pin for Buzzer*/
+	DDRD&=~(1<<PD2);			/* Define PD2 as input pin for push Button */
+	DDRD&=~(1<<PD3);			/* Define PD3 as input pin for push Button */
+	DDRB&=0X00;					/* Define PB0 : PB7 AS input pin for push button*/
+
+	PORTD|=(1<<PD2);			/* Activate The Internal Pull-up Res at PD2*/
+	PORTB|=0XFF;				/* Activate The Internal Pull-up Res PB0 : PB7*/
+
+	PORTD&=(1<<PD0);			/* Turn Off Buzzer Initially*/
+	DDRC|=0x0F;					/* Define PC0,PC1,PC2,PC3 as output pins for decoder*/
+	PORTC&=0xF0;				/* Initially Display 0 on seven segment*/
+	DDRA|=0x3F;					/* Define PA0:PA5 as output pins for Enable control Lines*/
+	PORTA&=0xC0;				/* Enable the 6 seven segments*/
+}
+
+		/*------------- External Interrupt INT0 Initialization -------------*/
+void ext_INT0_init(void)
+{
+	GICR|=(1<<INT0);			/* Enable external interrupt pin INT0 */
+	MCUCR|=(1<<ISC01);			/* Trigger INT0 with the Falling edge */
+}
+
+		/*------------- External Interrupt INT1 Initialization -------------*/
+void ext_INT1_init(void)
+{
+	GICR|=(1<<INT1);			/* Enable external interrupt pin INT1 */
+	MCUCR|=(1<<ISC11)|(ISC10);	/* Trigger INT1 with the Rising edge */
+}
+
+		/*------------- External Interrupt INT2 Initialization --------------*/
+void ext_INT2_init(void)
+{
+	GICR|=(1<<INT2);			/* Enable external interrupt pin INT2 */
+	MCUCSR&=~(1<<ISC2);			/* Trigger INT2 with the Falling edge */
+}
+
+		/*------------ Function used to Enable The Global Interrupts ----------*/
+void GIE(void)
+{
+	SREG|=(1<<7);				/* Enable Global Interrupts(I-bit)*/
+}
+		/*------------ Initialization timer1 on compare mode ----------*/
+void timer1_CTC_init(void)
+{
+	TCCR1A|=(1<<FOC1A);			/* non PWM mode*/
+	TCNT1=0;					/* Start Counting from Zero*/
+	TCCR1B|=0x0D;				/* choose Prescale=1024 and CTC mode (mode 4)*/
+	OCR1A=977;					/* Set Compare Value*/
+	TIMSK|=(1<<OCIE1A);			/* Compare mode timer1 Interrupt Enable */
+}
+
+		/*------------- External INT0 Interrupt Service Routine ----------*/
+ISR(INT0_vect)
+{
+	/*Reset The counting*/
+	TCNT1=0;
+	tick_sec=0;
+	tick_min=0;
+	tick_hr=0;
+}
+
+		/*------------- External INT1 Interrupt Service Routine ----------*/
+ISR(INT1_vect)
+{
+	TCCR1B&=~(1<<CS12)&~(1<<CS10);	/* Stop clock source (Timer/Counter stopped)*/
+}
+
+		/*------------- External INT2 Interrupt Service Routine ----------*/
+ISR(INT2_vect)
+{
+	TCCR1B|=(1<<CS12)|(1<<CS10);	/* Resume the clock source */
+}
+		/*------------- Timer1 CTC Interrupt Service Routine ----------*/
+ISR(TIMER1_COMPA_vect)
+{
+	PORTD&=~(1<<0);
+	if(count_down)
+	{
+		if(tick_sec>0)
+		{
+			tick_sec--;
+		}
+		else if(tick_sec==0 && tick_min>0)
+		{
+			tick_min--;
+			tick_sec=60;
+		}
+		else if(tick_sec==0 && tick_min==0 && tick_hr>0)
+		{
+			tick_hr--;
+			tick_min=60;
+		}
+		else
+		{
+			PORTD|=(1<<0);
+		}
+	}
+	else{
+		tick_sec++;							/* every compare match interrupt increment second */
+		/*In case number of second = 60 (1 minuit)*/
+		if (tick_sec == ONE_MINUIT)
+		{
+			tick_sec = 0;
+			tick_min++;
+			/*In case number of minuits = 60 (1 hour)*/
+			if (tick_min == ONE_HOUR)
+			{
+				tick_min = 0;
+				tick_hr++;
+				/* if the stop watch reach to 99 hour, it will be reset */
+				if (tick_hr == MAX_HOURS)
+				{
+					tick_sec = 0;
+					tick_min= 0;
+					tick_hr = 0;
+				}
+			}
+		}
+		}
+}
